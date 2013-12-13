@@ -111,20 +111,20 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
      */
     public void put(K key, V value)
     {
-        synchronized(this)
+        if(map.containsKey(key))
         {
-            if(map.containsKey(key))
-            {
-                System.out.println("put(key) returned because key - " + key + " is already present in the cache.");
-                return;
-            }
-            QueueNode<K, V> queueNode = new QueueNode<K, V>(key, value);
-            map.put(key, queueNode);
-            queue.offer(queueNode);        
+            System.out.println("put(key) returned because key - " + key + " is already present in the cache.");
+            return;
+        }
+                         
+        QueueNode<K, V> queueNode = new QueueNode<K, V>(key, value);
+        if(map.put(key, queueNode)==null) //this would not be null, if a contending thread has already added the same key.
+        {
+            queue.offer(queueNode);
             System.out.println("QueueNode - " + queueNode + " added to the cache.");
-        }                  
-        printCache();
-
+            printCache();
+        }
+        System.out.println("QueueNode - " + queueNode + " already added to the cache by a contending thread.");        
         purge();
     }
 
@@ -138,16 +138,18 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
             return;
         }
         
-        synchronized(this)
+        //The lock is on the queue. So while purging is going on, there could be operations happening on the map.
+        synchronized(queue)
         {
             //1. We'll check queue size one more time, because it might have changed.
             //2. Instead of purging one element, we will purge in bulk. So we can avoid entering the synchronized block 
             //   several times.
             int size = queue.size();
-            if(size>(maxCacheSize-bulkPurgeSize))
+            while(size>(maxCacheSize-bulkPurgeSize))
             {            
                 QueueNode<K,V> queueNode = queue.remove();
-                map.remove(queueNode.key);                                           
+                map.remove(queueNode.key);  
+                size--;
                 System.out.println("QueueNode - " + queueNode + " purged from the cache.");                       
                 printCache();
             }
