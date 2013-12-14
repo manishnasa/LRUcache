@@ -19,15 +19,14 @@ public class LRUCacheCommandImpl<K,V> implements LRUCacheCommand, Runnable
     
     @Override
     public void execute()
-    {
+    {        
         switch(cmdType)
         {
-            case REMOVE:
-                System.out.println("Timeout for QueueNode - " + queueNode);
-                cache.remove(queueNode.key);
+            case REMOVE:                
+                cache.removeNow(queueNode.key);
                 break;
             case PUT:
-                cache.put(queueNode.key, queueNode.value);
+                cache.putNow(queueNode.key, queueNode.value, queueNode.ttl);
                 break;                
         }
     }

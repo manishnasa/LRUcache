@@ -20,6 +20,7 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
 
     private Map<K, QueueNode<K, V>> map;
     private LRUQueue<QueueNode<K, V>> queue;
+    private Queue<LRUCacheCommand> scheduledOps; 
     private int maxCacheSize;
     private int bulkPurgeSize;
 
@@ -36,7 +37,17 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
         //to avoid rehashing when 3/4th capacity is reached.       
         map = new ConcurrentHashMap<K, QueueNode<K, V>>(maxCacheSize, 1);        
         
-        queue = new LRUConcurrentLinkedQueue<QueueNode<K, V>>();        
+        queue = new LRUConcurrentLinkedQueue<QueueNode<K, V>>();
+        
+        initScheduledOpsExecutor();
+    }
+    
+    private void initScheduledOpsExecutor()
+    {
+        scheduledOps = new ConcurrentLinkedQueue<LRUCacheCommand>();
+        ScheduledOpsExecutor scheduledOpsExecutor = new ScheduledOpsExecutor(scheduledOps);
+        ScheduledThreadPoolExecutor threadPool = new ScheduledThreadPoolExecutor(1);
+        threadPool.scheduleWithFixedDelay(scheduledOpsExecutor, 0, 100, TimeUnit.NANOSECONDS);       
     }
 
     /* (non-Javadoc)
@@ -47,17 +58,14 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
         System.out.println("get(key) called with key - " + key);
         V value = null;
         QueueNode<K, V> queueNode = null;
-        //The below synchronized block could be avoided at the cost of having a cache where sometimes
-        //a recently used element may get purged.
-        synchronized(this)
+        //We are not synchronizing the below block at the cost of having a possibility where sometimes
+        //a recently used element may get purged, and we have an inaccurate LRU cache. This is to increase the concurrency.       
+        queueNode = map.get(key);           
+        if(queueNode != null)            
         {
-            queueNode = map.get(key);           
-            if(queueNode != null)            
-            {
-                value = queueNode.value;
-                queue.moveToFront(queueNode);
-            }
-        }
+            value = queueNode.value;
+            queue.moveToFront(queueNode);
+        }        
         if( queueNode == null )
         {
             value = cacheMiss(key);
@@ -83,19 +91,26 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
         return value;        
     }  
     
-    /* (non-Javadoc)
-     * @see LRUCache#put(java.lang.Object, java.lang.Object)
-     */
     public void put(K key, V value)
     {
         put(key,value,-1);
         return;
     }
-
-    /* (non-Javadoc)
-     * @see LRUCache#put(java.lang.Object, java.lang.Object)
-     */
+        
     public void put(K key, V value, long ttl)
+    {
+        QueueNode<K,V> queueNode = new QueueNode<K,V>(key, value, ttl);
+        LRUCacheCommand putCommand = new LRUCacheCommandImpl<K,V>(this, CommandType.PUT, queueNode);
+        scheduledOps.add(putCommand);
+    }
+      
+    public void putNow(K key, V value)
+    {
+        putNow(key,value,-1);
+        return;
+    }
+    
+    public void putNow(K key, V value, long ttl)
     {
         if(map.containsKey(key))
         {
@@ -121,14 +136,14 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
         
         if(ttl>0) 
         {
-            scheduleRemove(queueNode, ttl);
+            scheduleTimedRemove(queueNode, ttl);
         }
         purge();
     }
     
-    private void scheduleRemove(QueueNode<K, V> queueNode, long ttl)
+    private void scheduleTimedRemove(QueueNode<K, V> queueNode, long ttl)
     {
-        LRUCacheCommandImpl<K, V> removeCommand = new LRUCacheCommandImpl<K,V>(this, CommandType.REMOVE, queueNode);
+        LRUCacheCommand removeCommand = new LRUCacheCommandImpl<K,V>(this, CommandType.REMOVE, queueNode);
         //We'll keep the pool size to 1. Because anyways we have a blocking queue. Multiple threads may not add much significance.
         //So TTL removes may not be accurate.
         ScheduledThreadPoolExecutor threadPool = new ScheduledThreadPoolExecutor(1);
@@ -161,11 +176,18 @@ public class LRUCacheImpl<K,V> implements LRUCache<K,V>
             printCache();
         }
     }
+    
+    public void remove(K key)
+    {
+        QueueNode<K,V> queueNode = new QueueNode<K,V>(key);
+        LRUCacheCommand removeCommand = new LRUCacheCommandImpl<K,V>(this, CommandType.REMOVE, queueNode);
+        scheduledOps.add(removeCommand);
+    }
 
     /* (non-Javadoc)
      * @see LRUCache#remove(java.lang.Object)
      */
-    public void remove(K key)
+    public void removeNow(K key)
     {
         if(!map.containsKey(key))
         {
