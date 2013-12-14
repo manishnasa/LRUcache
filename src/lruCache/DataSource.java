@@ -1,4 +1,4 @@
-package LRUCache;
+package lruCache;
 
 /**
  * All data sources must implement this interface, to allow the LRUCache to use them.

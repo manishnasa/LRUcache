@@ -1,4 +1,4 @@
-package LRUCache;
+package lruCache;
 
 public class QueueNode<K, V>
 {

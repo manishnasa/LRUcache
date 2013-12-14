@@ -2,18 +2,33 @@ package apps;
 
 import java.util.HashMap;
 
-import LRUCache.DataSource;
-import LRUCache.DataSourceImpl;
-import LRUCache.LRUCache;
-import LRUCache.LRUCacheImpl;
+import lruCache.DataSource;
+import lruCache.DataSourceImpl;
+import lruCache.LRUCache;
+import lruCache.LRUCacheImpl;
 
 public class MyThreadedApp implements Runnable
 {
     private DataSource<String, String> dataSrc;
     private LRUCache<String, String> cache;
     
-    public MyThreadedApp()
+    public enum TestThreadMode {GET,PUT,REMOVE};
+    
+    private TestThreadMode mode;
+    
+    public TestThreadMode getMode()
     {
+        return mode;
+    }
+
+    public void setMode(TestThreadMode mode)
+    {
+        this.mode = mode;
+    }
+
+    public MyThreadedApp(TestThreadMode mode)
+    {
+        this.mode = mode;
         populateDataSource();
         initCache(5);
     }
@@ -55,10 +70,49 @@ public class MyThreadedApp implements Runnable
     {
         cache = new LRUCacheImpl<String, String>(cacheSize, dataSrc);
     }
+    
+    private void put5()
+    {
+        cache.put("a","A");
+        cache.put("b","B");
+        cache.put("c","C");
+        cache.put("d","D");
+        cache.put("e","E");              
+    }
+    
+    private void get5()
+    {
+        cache.get("a");
+        cache.get("b");
+        cache.get("c");
+        cache.get("d");
+        cache.get("e");              
+    }
+    
+    private void remove5()
+    {
+        get5();
+        cache.remove("a");
+        cache.remove("b");
+        cache.remove("c");
+        cache.remove("d");
+        cache.remove("e");              
+    }
        
     @Override
     public void run()
     {
-        cache.get("a");
+        switch(mode)
+        {
+            case GET:
+                get5();
+                break;
+            case PUT:
+                put5();
+                break;
+            case REMOVE:
+                remove5();
+                break;
+        }
     }    
 }

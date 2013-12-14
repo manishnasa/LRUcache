@@ -1,4 +1,4 @@
-package LRUCache;
+package lruCache;
 
 /**
  * All implementations of LRUCache must implement this interface,
@@ -10,5 +10,6 @@ public interface LRUCache<K, V>
 {
     public V get(K key);
     public void put(K key, V value);
+    public void put(K key, V value, long ttl);
     public void remove(K key);
 }

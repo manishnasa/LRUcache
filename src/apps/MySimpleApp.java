@@ -2,10 +2,10 @@ package apps;
 
 import java.util.HashMap;
 
-import LRUCache.DataSource;
-import LRUCache.DataSourceImpl;
-import LRUCache.LRUCache; 
-import LRUCache.LRUCacheImpl;
+import lruCache.DataSource;
+import lruCache.DataSourceImpl;
+import lruCache.LRUCache;
+import lruCache.LRUCacheImpl;
 
 public class MySimpleApp
 {       
